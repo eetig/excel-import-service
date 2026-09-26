@@ -42,3 +42,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### 容器日志（docker-compose 的 ./logs bind mount） ###
+/logs/

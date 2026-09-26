@@ -8,11 +8,35 @@ group = 'org.example'
 version = '1.0-SNAPSHOT'
 
 java {
-    sourceCompatibility = '17'
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
+    maven { url 'https://maven.aliyun.com/repository/central' }
+    maven { url 'https://maven.aliyun.com/repository/spring' }
     mavenCentral()
+}
+
+// 中文源码必须 UTF-8
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 只留一个可执行 jar，避免 build/libs 下有俩 jar 导致 Dockerfile 的 COPY 歧义
+tasks.named('jar') { enabled = false }
+
+// 固定产物文件名，让 Dockerfile 里 COPY 的路径稳定、不随版本号变化
+bootJar {
+    archiveFileName = 'excel-import-service.jar'
+    // 便于在服务器上确认镜像内跑的到底是哪次构建
+    manifest {
+        attributes(
+                'Implementation-Title': 'excel-import-service',
+                'Implementation-Version': project.version,
+                'Build-Time': new Date().format("yyyy-MM-dd HH:mm:ss")
+        )
+    }
 }
 
 // 重点：添加dependencyManagement，导入alibaba bom

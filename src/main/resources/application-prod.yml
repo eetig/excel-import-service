@@ -1,0 +1,58 @@
+# ============================================================
+# 生产环境配置（容器内生效，由 ENTRYPOINT 的 --spring.profiles.active=prod 激活）
+# 所有地址均通过环境变量注入，换服务器/换域名不需要重新打 jar
+# ============================================================
+server:
+  # 宿主机 8082 已被占用，本服务统一走 8083
+  port: ${SERVER_PORT:8083}
+  # 优雅停机：容器收到 SIGTERM 后先停止接收新请求，处理完在途请求再退出
+  shutdown: graceful
+
+spring:
+  application:
+    name: excel-import-service
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  cloud:
+    nacos:
+      discovery:
+        # 容器之间用容器名互访，不要写 127.0.0.1（那是容器自己）
+        server-addr: ${NACOS_SERVER_ADDR:nacos:8848}
+        # Nacos 命名空间，留空=public。用命名空间隔离环境时必须填 namespace 的 ID（不是名称）
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+        register-enabled: true
+        # 多网卡机器上注册成错 IP（服务列表里有、调用方 502）才填，留空自动探测
+        ip: ${NACOS_REGISTER_IP:}
+        # 默认 true：Nacos 不可达时启动即失败。配合 compose 的 restart: unless-stopped
+        # 会一直重试，保证「服务在跑 = 一定注册上了」；置 false 能启动但不会注册
+        # （服务列表里看不见），属于静默故障，不建议改。
+        fail-fast: ${NACOS_FAIL_FAST:true}
+
+  servlet:
+    multipart:
+      # Excel 模板文件比图片大，超了就在 1Panel 环境变量里调，不用重新打 jar
+      max-file-size: ${MAX_FILE_SIZE:5MB}
+      max-request-size: ${MAX_REQUEST_SIZE:5MB}
+
+# ============================================================
+# 本服务不需要 MySQL / Redis / MinIO：
+# build.gradle 里只有 web + easyexcel + validation + nacos-discovery，
+# Excel 解析全程在内存完成，不落库、不写对象存储。
+# 后续要落库/存附件，再补依赖并照 img-service 的写法加配置。
+# ============================================================
+
+logging:
+  level:
+    root: info
+    org.example: info
+  file:
+    # 输出到挂载目录，1Panel 里可持久化到宿主机
+    name: /app/logs/excel-import-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 20MB
+      max-history: 15
+      total-size-cap: 500MB

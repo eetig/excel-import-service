@@ -1,0 +1,46 @@
+# ============================================================
+# excel-import-service 容器编排（1Panel「容器 -> 编排」直接粘贴）
+# 前提：镜像 excel-import-service:latest 已在 1Panel 构建完成
+#
+# 对应方案 A：不改任何 yml、不重新打包，全部通过环境变量注入
+# ============================================================
+services:
+  excel-import-service:
+    image: excel-import-service:latest
+    container_name: excel-import-service
+    restart: unless-stopped
+    environment:
+      - "TZ=Asia/Shanghai"
+      # ---- Nacos ----
+      # 容器名互访，不可写 127.0.0.1（那是容器自己）
+      - "NACOS_SERVER_ADDR=1Panel-nacos-qquH-standalone:8848"
+      # 命名空间必须填 ID 而不是名称，否则会注册到 public 导致找不到服务
+      - "NACOS_NAMESPACE=你的命名空间ID"
+      # - "NACOS_GROUP=DEFAULT_GROUP"
+      # ---- 可选：Excel 模板超过 5MB 时在这里调（Nginx 的 client_max_body_size 也要同步调大）----
+      # - "MAX_FILE_SIZE=50MB"
+      # - "MAX_REQUEST_SIZE=50MB"
+      # ---- 可选：调 JVM 参数，改这里不用重新构建镜像 ----
+      # - "JAVA_OPTS=-Xms256m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseG1GC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+    volumes:
+      # 日志持久化到宿主机（相对本 compose 文件所在目录），容器重建不丢
+      # ⚠ ./logs 若由 Docker 自动创建，属主是 root，容器内 app 用户写不进去，
+      #   表现为「控制台有日志、文件日志是空的」。首次部署前先执行：
+      #   mkdir -p logs && chmod 777 logs
+      - ./logs:/app/logs
+    ports:
+      # 关键：宿主机侧只绑 127.0.0.1，不绑 0.0.0.0
+      # 1Panel 的 Nginx(OpenResty) 跑在宿主机上，需要能连到容器；
+      # 绑 127.0.0.1 后仅宿主机本地可达，公网无法直连，符合"微服务不暴露公网端口"
+      # 宿主机 8082 已被占用，容器内外统一用 8083
+      # 所以 Nginx 里 proxy_pass 要写 http://127.0.0.1:8083
+      - "127.0.0.1:8083:8083"
+    networks:
+      - nacos_default
+
+networks:
+  # 由部署 Nacos 的那个 compose 项目创建的既有网络，本文件只引用不创建
+  # （名字用 `docker network ls` 查证，与 nacos 容器所在网络一致）
+  nacos_default:
+    external: true
+    name: nacos_default

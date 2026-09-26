@@ -1,10 +1,16 @@
 server:
-  port: 8082
+  # 宿主机 8082 已被占用，本服务统一走 8083
+  port: ${SERVER_PORT:8083}
 
 spring:
   application:
-    name: excel-import-service # 服务名称，注册到Nacos的名字（Feign要和这个一致！）
+    name: excel-import-service
   cloud:
     nacos:
       discovery:
-        server-addr: 127.0.0.1:8848 # nacos地址
+        server-addr: ${NACOS_SERVER_ADDR:1Panel-nacos-qquH-standalone:8848}
+  servlet:
+    multipart:
+      # Excel 模板文件比图片大，超了就在 1Panel 环境变量里调，不用重新打 jar
+      max-file-size: ${MAX_FILE_SIZE:5MB}
+      max-request-size: ${MAX_REQUEST_SIZE:5MB}
