@@ -1,0 +1,26 @@
+# ============================================================
+# 本地开发配置模板
+#
+# 用法：复制为同目录下的 application.yml
+#     cp config/application.yml.example config/application.yml
+#
+# 为什么需要它：
+#   classpath 里的 application.yml 是「本地默认 + 容器默认」共用的，
+#   其 nacos 默认值写的是容器名 1Panel-nacos-qquH-standalone，
+#   宿主机解析不了，因此本地直跑会启动失败。
+#
+#   本文件把地址覆盖成本机 Nacos，从而：
+#     - 本地：直接 RUN 即可，不需要每次在 IDEA 里配环境变量
+#     - 容器：工作目录 /app 下没有 config/，本文件不被加载，
+#             仍走 application-prod.yml + compose 的 NACOS_SERVER_ADDR，
+#             容器行为完全不受影响
+#
+# config/application.yml 本身已被 .gitignore 排除，不会误提交。
+# ============================================================
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        # 宿主机上本地启动：连本机 Nacos
+        server-addr: 127.0.0.1:8848
