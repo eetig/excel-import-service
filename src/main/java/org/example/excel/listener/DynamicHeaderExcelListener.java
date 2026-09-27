@@ -2,7 +2,7 @@ package org.example.excel.listener;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
 import lombok.Getter;
-import org.example.excel.dto.GoodsMoveExcelDTO;
+import org.example.dto.GoodsMoveExcelDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

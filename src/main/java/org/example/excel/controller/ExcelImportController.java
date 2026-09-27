@@ -1,7 +1,7 @@
 package org.example.excel.controller;
 
 import com.alibaba.excel.EasyExcel;
-import org.example.excel.dto.ExcelResult;
+import org.example.dto.ExcelResult;
 import org.example.excel.dto.MaterialPickExcelDTO;
 import org.example.excel.listener.CommonExcelListener;
 import org.example.excel.listener.DynamicHeaderExcelListener;
