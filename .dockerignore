@@ -9,3 +9,5 @@ out
 .vscode
 .DS_Store
 logs
+# 本地开发配置：内含各人本机的 Nacos 地址，不应进构建上下文
+config

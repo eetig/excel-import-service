@@ -1,8 +1,11 @@
 # ============================================================
 # excel-import-service 容器编排（1Panel「容器 -> 编排」直接粘贴）
-# 前提：镜像 excel-import-service:latest 已在 1Panel 构建完成
 #
-# 对应方案 A：不改任何 yml、不重新打包，全部通过环境变量注入
+# 前提：镜像 excel-import-service:latest 已在 1Panel 构建完成
+#   构建目录选 D:\deploy\excel-import-service（jar 与 Dockerfile 同目录）
+#
+# 全部配置通过环境变量注入：换服务器/换端口/换密码都不用重新打 jar，
+# 改完只需删除容器、用本编排重新创建（几十秒）
 # ============================================================
 services:
   excel-import-service:
@@ -11,36 +14,61 @@ services:
     restart: unless-stopped
     environment:
       - "TZ=Asia/Shanghai"
+
       # ---- Nacos ----
-      # 容器名互访，不可写 127.0.0.1（那是容器自己）
+      # 容器之间用容器名互访，不可写 127.0.0.1（那是容器自己）
+      # 已核对本环境的真实容器名：1Panel-nacos-qquH-standalone
+      # 客户端还需 gRPC 端口（本端口 +1000 = 9848），同一 docker 网络内天然可达
       - "NACOS_SERVER_ADDR=1Panel-nacos-qquH-standalone:8848"
-      # 命名空间必须填 ID 而不是名称，否则会注册到 public 导致找不到服务
-      - "NACOS_NAMESPACE=你的命名空间ID"
+
+      # 命名空间：注释掉/留空 = 注册到 public。
+      # ⚠ 如果你其它服务用了命名空间，这里必须填「命名空间 ID」（不是名称），
+      #   且与其它服务保持一致，否则会注册到 public 导致互相找不到。
+      # ⚠ 千万别留成占位符字符串（如"你的命名空间ID"），那会被当成真实 ID 用。
+      # - "NACOS_NAMESPACE="
       # - "NACOS_GROUP=DEFAULT_GROUP"
-      # ---- 可选：Excel 模板超过 5MB 时在这里调（Nginx 的 client_max_body_size 也要同步调大）----
-      # - "MAX_FILE_SIZE=50MB"
-      # - "MAX_REQUEST_SIZE=50MB"
+
+      # 服务注册失败即启动失败（默认 true）。配合本文件的 restart: unless-stopped
+      # 会一直重试，语义是「服务在跑 = 一定注册上了」。
+      # 置 false 能启动但不注册（服务列表里看不见），属于静默故障，不建议改。
+      # - "NACOS_FAIL_FAST=true"
+
+      # ---- 可选：Excel 模板超过 5MB 时在这里调 ----
+      # ⚠ 必须同步调大宿主机 Nginx 的 client_max_body_size，
+      #   否则超限请求返回 413 且根本到不了应用，日志里查不到任何记录
+      # - "MAX_FILE_SIZE=20MB"
+      # - "MAX_REQUEST_SIZE=20MB"
+
       # ---- 可选：调 JVM 参数，改这里不用重新构建镜像 ----
-      # - "JAVA_OPTS=-Xms256m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseG1GC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+      # 解析大 Excel 出现 OOM 时优先调大 -Xmx
+      # - "JAVA_OPTS=-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
+
     volumes:
-      # 日志持久化到宿主机（相对本 compose 文件所在目录），容器重建不丢
-      # ⚠ ./logs 若由 Docker 自动创建，属主是 root，容器内 app 用户写不进去，
-      #   表现为「控制台有日志、文件日志是空的」。首次部署前先执行：
-      #   mkdir -p logs && chmod 777 logs
+      # 日志持久化到宿主机（相对本 compose 文件所在目录），容器重建不丢。
+      #
+      # ⚠ 首次部署前必须先建好目录并交给 UID 1000，否则容器内 app 用户写不进去。
+      #   症状是「docker logs 有日志、但日志文件是空的」—— 不报错，极易漏。
+      #   在本 compose 文件所在目录执行：
+      #       mkdir -p logs && chown -R 1000:1000 logs
+      #   （Dockerfile 里 app 用户的 UID/GID 固定为 1000，所以这条命令是确定生效的）
       - ./logs:/app/logs
+
     ports:
-      # 关键：宿主机侧只绑 127.0.0.1，不绑 0.0.0.0
-      # 1Panel 的 Nginx(OpenResty) 跑在宿主机上，需要能连到容器；
-      # 绑 127.0.0.1 后仅宿主机本地可达，公网无法直连，符合"微服务不暴露公网端口"
-      # 宿主机 8082 已被占用，容器内外统一用 8083
-      # 所以 Nginx 里 proxy_pass 要写 http://127.0.0.1:8083
+      # 宿主机侧只绑 127.0.0.1，不绑 0.0.0.0：
+      #   1Panel 的 Nginx(OpenResty) 跑在宿主机上，需要能连到容器；
+      #   绑 127.0.0.1 后仅宿主机本地可达，公网无法直连，
+      #   满足「微服务不暴露公网端口」。
+      # 容器内外统一 8083（宿主机 8082 已被占用）
+      # ⚠ Nginx 反代的 proxy_pass 要写 http://127.0.0.1:8083
       - "127.0.0.1:8083:8083"
+
     networks:
       - nacos_default
 
 networks:
-  # 由部署 Nacos 的那个 compose 项目创建的既有网络，本文件只引用不创建
-  # （名字用 `docker network ls` 查证，与 nacos 容器所在网络一致）
+  # 由部署 Nacos 的那个 compose 项目创建的既有网络，本文件只引用不创建。
+  # ⚠ 名字先用 `docker network ls` 查证，须与 Nacos 容器所在网络一致；
+  #   不在同一网络 = 容器名解析不了 = 启动即失败（最常见的坑）
   nacos_default:
     external: true
     name: nacos_default
