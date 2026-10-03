@@ -17,6 +17,14 @@ spring:
 
   cloud:
     nacos:
+      # 仅对「开了鉴权的 Nacos」需要填；留空=不传账密（本机 Nacos 未开鉴权，留空即可）。
+      # 云 Nacos 开鉴权后由 1Panel 注入 NACOS_USERNAME / NACOS_PASSWORD（见 Nacos与FRP隧道说明.md 第 9 节）。
+      # 注意：必须写在这一层（spring.cloud.nacos 下、与 discovery 同级）——
+      #   discovery starter 的 NacosDiscoveryProperties 绑定的是 spring.cloud.nacos.username/password，
+      #   写成 discovery.username / discovery.auth.username 均不生效（后者是 config 侧的旧写法）。
+      # 另外三个服务（hnd_factory / img-service / myocr）早已补齐这两行，这里是补漏（变更-007 第一步）。
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
       discovery:
         # 容器之间用容器名互访，不要写 127.0.0.1（那是容器自己）。
         # 默认值必须与 application.yml 保持一致，都用本环境真实容器名：

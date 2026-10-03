@@ -44,14 +44,13 @@ services:
       # - "JAVA_OPTS=-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
 
     volumes:
-      # 日志持久化到宿主机（相对本 compose 文件所在目录），容器重建不丢。
-      #
-      # ⚠ 首次部署前必须先建好目录并交给 UID 10001，否则容器内 app 用户写不进去。
-      #   症状是「docker logs 有日志、但日志文件是空的」—— 不报错，极易漏。
-      #   在本 compose 文件所在目录执行：
-      #       mkdir -p logs && chown -R 10001:10001 logs
+      # 日志落到宿主机 /opt/excel-import-service/logs，容器重建不丢。
+      # 写绝对路径（不是 ./logs）：compose 文件放在哪个目录都不影响落点。
+      # ⚠ 首次部署前在宿主机执行：
+      #      mkdir -p /opt/excel-import-service/logs && chown -R 10001:10001 /opt/excel-import-service/logs
       #   （Dockerfile 里 app 用户的 UID/GID 固定为 10001，所以这条命令是确定生效的）
-      - ./logs:/app/logs
+      #   属主不对的症状是「docker logs 有日志、但日志文件是空的」—— 不报错，极易漏。
+      - /opt/excel-import-service/logs:/app/logs
 
     ports:
       # 宿主机侧只绑 127.0.0.1，不绑 0.0.0.0：
